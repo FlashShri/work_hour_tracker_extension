@@ -1,0 +1,142 @@
+╔══════════════════════════════════════════════════════════════╗
+║                                                              ║
+║      🕐 WORK HOURS TRACKER v2.0 - QUICK START                ║
+║         ✨ Now with Editable Times & Custom Targets!         ║
+║                                                              ║
+╚══════════════════════════════════════════════════════════════╝
+
+📦 INSTALLATION (3 EASY STEPS)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Open Chrome and type in address bar:
+   chrome://extensions/
+
+2. Turn ON "Developer mode" (toggle at top-right)
+
+3. Click "Load unpacked" and select this folder:
+   work-hours-tracker/
+
+✅ Done! Look for the clock icon in your toolbar.
+
+
+🚀 BASIC USAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+MORNING (When you arrive):
+└─ Click extension icon → Click "🟢 Punch In"
+
+BREAK TIME:
+└─ Click "☕ Start Break" → Click "⏸️ End Break" when back
+
+EVENING (When leaving):
+└─ Click "🔴 Punch Out"
+
+
+✨ NEW v2.0 FEATURES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚙️  CUSTOM TARGET HOURS:
+    └─ Click "⚙️ Settings"
+    └─ Change "Target Hours Per Day" (e.g., 7, 8.5, 9)
+    └─ Click "💾 Save Settings"
+
+✏️  EDIT PUNCH IN TIME (if you made a mistake):
+    └─ Click on the punch in time (shows like "9:00 AM")
+    └─ Select correct time
+    └─ Click "💾 Update"
+
+📝 MANUAL ENTRY (add past days or custom times):
+    └─ Click "✏️ Manual Entry"
+    └─ Set punch in time (required)
+    └─ Set punch out time (optional for today, required for past)
+    └─ Choose date
+    └─ Click "💾 Save Entry"
+
+
+💡 COMMON SCENARIOS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📌 Company requires 7.5 hours instead of 8.5:
+   → Settings → Change to 7.5 → Save
+
+📌 Forgot to punch in (arrived 9 AM, punched at 10 AM):
+   → Punch in now → Click "10:00 AM" → Change to "9:00 AM"
+
+📌 Forgot to track yesterday:
+   → Manual Entry → Set times → Change date to yesterday → Save
+
+📌 Working 10 hours today to leave early Friday:
+   → Settings → Change to 10 → Work normally → Change back tomorrow
+
+
+🔔 NOTIFICATIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+You'll get notified:
+⚠️  At (Target - 30 min) - e.g., 8:00 if target is 8.5
+🎉 At Target Hours - e.g., 8.5 hours complete!
+
+The number on the extension icon = hours worked
+
+
+💡 PRO TIPS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✓ Pin the extension (click puzzle icon → pin)
+✓ Edit immediately if you notice wrong punch time
+✓ Use Manual Entry for forgotten days (up to 7 days shown)
+✓ Adjust target daily if you have flexible hours
+✓ Check History tab to review your week
+✓ Break tracking ensures accurate hours
+✓ Chrome must be running for tracking
+
+
+🔧 TROUBLESHOOTING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Can't edit punch in?
+→ Must be currently punched in
+→ Use Manual Entry for past days
+
+Manual entry not saving?
+→ Past dates need both in AND out times
+→ Today needs only in time to start session
+
+Settings not saving?
+→ Click "Save Settings" button
+→ Refresh the popup
+
+
+📧 SHARING WITH TEAM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Zip the work-hours-tracker folder
+2. Share via email/drive
+3. Everyone installs following same steps
+4. Everyone sets their own target hours!
+5. Each person tracks independently
+
+
+🎯 WHAT'S DIFFERENT IN v2.0?
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+v1.0 → Fixed 8.5 hours only
+v2.0 → Any target from 1-24 hours ✅
+
+v1.0 → Can't change punch in time
+v2.0 → Click to edit anytime ✅
+
+v1.0 → No historical entries
+v2.0 → Add past days manually ✅
+
+
+🔒 PRIVACY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+All data stored locally. Nothing sent anywhere!
+
+
+═══════════════════════════════════════════════════════════════
+       Read README.md for detailed documentation
+       Version 2.0 - Full control over your time! 🎉
+═══════════════════════════════════════════════════════════════
