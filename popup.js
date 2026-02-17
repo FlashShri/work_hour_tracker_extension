@@ -202,7 +202,7 @@ async function updateDisplay() {
 
   // Update timer
   timerEl.textContent = formatDuration(workingTime);
-  const earned = (workingTime / (60 * 60 * 1000)) * HOURLY_RATE;
+  const earned = calculateEarnedAmount(workingTime);
   earnedTodayDisplayEl.textContent = formatAmount(earned);
 
   // Update remaining time
@@ -263,7 +263,7 @@ async function handlePunchOut() {
 
   const totalElapsed = now - data.punchInTime;
   const workingTime = totalElapsed - finalBreakTime;
-  const earnedAmount = (workingTime / (60 * 60 * 1000)) * HOURLY_RATE;
+  const earnedAmount = calculateEarnedAmount(workingTime);
 
   // Save to history
   await saveToHistory({
@@ -457,6 +457,12 @@ function formatAmount(amount) {
   });
 }
 
+function calculateEarnedAmount(workingTimeMs) {
+  // Earnings stop increasing once target time is completed.
+  const cappedWorkingTimeMs = Math.max(0, Math.min(workingTimeMs, TARGET_MS));
+  return (cappedWorkingTimeMs / (60 * 60 * 1000)) * HOURLY_RATE;
+}
+
 function recalculateSalaryRates() {
   DAILY_SALARY = MONTHLY_SALARY / 30;
   HOURLY_RATE = TARGET_HOURS > 0 ? DAILY_SALARY / TARGET_HOURS : 0;
@@ -594,7 +600,7 @@ async function saveManualEntry() {
     }
 
     const workingTime = punchOutMs - punchInMs;
-    const earnedAmount = (workingTime / (60 * 60 * 1000)) * HOURLY_RATE;
+    const earnedAmount = calculateEarnedAmount(workingTime);
 
     // Save to history
     await saveToHistory({

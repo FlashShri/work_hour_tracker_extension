@@ -1,6 +1,7 @@
 // Constants
 let TARGET_HOURS = 8.5; // Default, will be loaded from storage
 let TARGET_MS = TARGET_HOURS * 60 * 60 * 1000;
+let hasPlayedCompletionSound = false;
 
 // Load target hours on startup
 async function loadTargetHours() {
@@ -22,6 +23,27 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     checkAndNotify();
   }
 });
+function playCompletionSound() {
+  chrome.tts.getVoices(function (voices) {
+    // Specifically target Kalpana by name
+    const hindiVoice = voices.find(
+      (v) => v.voiceName === 'Microsoft Kalpana - Hindi (India)'
+    );
+
+    const options = {
+      rate: 1.0,
+      pitch: 1.2,
+      volume: 1.0,
+      voiceName: hindiVoice ? hindiVoice.voiceName : undefined,
+      lang: 'hi-IN', // Setting this ensures the correct accentuation
+    };
+
+    // Updated the text to Hindi for a better experience with this voice
+    const message = `बस करो भाई! ${TARGET_HOURS} घंटे हो गए. अब क्या जान लोगे क्या?`;
+
+    chrome.tts.speak(message, options);
+  });
+}
 
 // Listen for alarm
 chrome.alarms.onAlarm.addListener((alarm) => {
@@ -114,6 +136,10 @@ async function checkAndNotify() {
     });
 
     await chrome.storage.local.set({ notified8_5: true });
+    if (!hasPlayedCompletionSound) {
+      playCompletionSound();
+      hasPlayedCompletionSound = true;
+    }
 
     // Change badge color to green
     chrome.action.setBadgeBackgroundColor({ color: '#10b981' });
@@ -147,6 +173,7 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
       notified8: false,
       notified8_5: false,
     });
+    hasPlayedCompletionSound = false;
   }
 
   if (namespace === 'local' && changes.isActive && !changes.isActive.newValue) {
