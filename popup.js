@@ -64,21 +64,37 @@ function init() {
   punchOutBtn.addEventListener('click', handlePunchOut);
   toggleBreakBtn.addEventListener('click', handleToggleBreak);
   manualEntryBtn.addEventListener('click', openManualModal);
-  
+
   // Manual entry modal
-  document.getElementById('closeModal').addEventListener('click', closeManualModal);
-  document.getElementById('cancelModal').addEventListener('click', closeManualModal);
-  document.getElementById('saveManual').addEventListener('click', saveManualEntry);
-  
+  document
+    .getElementById('closeModal')
+    .addEventListener('click', closeManualModal);
+  document
+    .getElementById('cancelModal')
+    .addEventListener('click', closeManualModal);
+  document
+    .getElementById('saveManual')
+    .addEventListener('click', saveManualEntry);
+
   // Edit punch in modal
   punchInValueEl.addEventListener('click', openEditPunchInModal);
-  document.getElementById('closePunchInModal').addEventListener('click', closeEditPunchInModal);
-  document.getElementById('cancelPunchInEdit').addEventListener('click', closeEditPunchInModal);
-  document.getElementById('savePunchInEdit').addEventListener('click', savePunchInEdit);
-  
+  document
+    .getElementById('closePunchInModal')
+    .addEventListener('click', closeEditPunchInModal);
+  document
+    .getElementById('cancelPunchInEdit')
+    .addEventListener('click', closeEditPunchInModal);
+  document
+    .getElementById('savePunchInEdit')
+    .addEventListener('click', savePunchInEdit);
+
   // Settings
-  document.getElementById('toggleSettings').addEventListener('click', toggleSettings);
-  document.getElementById('saveSettings').addEventListener('click', saveSettings);
+  document
+    .getElementById('toggleSettings')
+    .addEventListener('click', toggleSettings);
+  document
+    .getElementById('saveSettings')
+    .addEventListener('click', saveSettings);
 
   // Set default date to today
   const today = new Date().toISOString().split('T')[0];
@@ -88,33 +104,42 @@ function init() {
   loadSettings().then(() => {
     loadState();
   });
-  
+
   // Start updating every second
   updateInterval = setInterval(updateDisplay, 1000);
 }
 
 async function loadState() {
-  const data = await chrome.storage.local.get(['punchInTime', 'isActive', 'breakStartTime', 'totalBreakTime', 'history', 'todayLog']);
-  
+  const data = await chrome.storage.local.get([
+    'punchInTime',
+    'isActive',
+    'breakStartTime',
+    'totalBreakTime',
+    'history',
+    'todayLog',
+  ]);
+
   if (data.isActive && data.punchInTime) {
     // Active session
     punchInBtn.disabled = true;
     punchOutBtn.disabled = false;
     toggleBreakBtn.disabled = false;
-    
+
     statusEl.textContent = 'Currently Working';
     statusEl.style.color = '#10b981';
-    
+
     // Show punch in time info
     punchInTimeEl.style.display = 'flex';
     estimatedOutEl.style.display = 'flex';
-    
+
     const punchInDate = new Date(data.punchInTime);
     punchInValueEl.textContent = formatTime(punchInDate);
-    
-    const estimatedOut = new Date(data.punchInTime + TARGET_MS + (data.totalBreakTime || 0));
+
+    const estimatedOut = new Date(
+      data.punchInTime + TARGET_MS + (data.totalBreakTime || 0)
+    );
     estimatedOutValueEl.textContent = formatTime(estimatedOut);
-    
+
     // Check if on break
     if (data.breakStartTime) {
       toggleBreakBtn.textContent = '⏸️ End Break';
@@ -128,15 +153,15 @@ async function loadState() {
     punchInBtn.disabled = false;
     punchOutBtn.disabled = true;
     toggleBreakBtn.disabled = true;
-    
+
     statusEl.textContent = 'Not Punched In';
     statusEl.style.color = '#657786';
-    
+
     punchInTimeEl.style.display = 'none';
     estimatedOutEl.style.display = 'none';
     breakTimeEl.style.display = 'none';
   }
-  
+
   // Load history
   displayTodayLog(data.todayLog || []);
   displayHistory(data.history || []);
@@ -144,35 +169,42 @@ async function loadState() {
 }
 
 async function updateDisplay() {
-  const data = await chrome.storage.local.get(['punchInTime', 'isActive', 'breakStartTime', 'totalBreakTime']);
-  
+  const data = await chrome.storage.local.get([
+    'punchInTime',
+    'isActive',
+    'breakStartTime',
+    'totalBreakTime',
+  ]);
+
   if (!data.isActive || !data.punchInTime) {
     timerEl.textContent = '00:00:00';
     remainingEl.textContent = '';
     earnedTodayDisplayEl.textContent = formatAmount(0);
     return;
   }
-  
+
   const now = Date.now();
   const punchInTime = data.punchInTime;
   const totalBreakTime = data.totalBreakTime || 0;
-  
+
   // Calculate current break time if on break
   let currentBreakTime = 0;
   if (data.breakStartTime) {
     currentBreakTime = now - data.breakStartTime;
-    breakDurationEl.textContent = formatDuration(totalBreakTime + currentBreakTime);
+    breakDurationEl.textContent = formatDuration(
+      totalBreakTime + currentBreakTime
+    );
   }
-  
+
   // Calculate working time (exclude breaks)
   const totalElapsed = now - punchInTime;
   const workingTime = totalElapsed - totalBreakTime - currentBreakTime;
-  
+
   // Update timer
   timerEl.textContent = formatDuration(workingTime);
   const earned = (workingTime / (60 * 60 * 1000)) * HOURLY_RATE;
   earnedTodayDisplayEl.textContent = formatAmount(earned);
-  
+
   // Update remaining time
   const remaining = TARGET_MS - workingTime;
   if (remaining > 0) {
@@ -183,46 +215,56 @@ async function updateDisplay() {
     remainingEl.textContent = `✅ Completed! +${formatDuration(overtime)} overtime`;
     remainingEl.style.color = '#10b981';
   }
-  
+
+  // 🔥 Instant completion check when popup is open
+  if (workingTime >= TARGET_MS) {
+    chrome.runtime.sendMessage({ action: 'checkCompletionNow' });
+  }
   // Update badge
   const hoursWorked = Math.floor(workingTime / (60 * 60 * 1000));
   chrome.action.setBadgeText({ text: hoursWorked.toString() });
-  chrome.action.setBadgeBackgroundColor({ color: remaining > 0 ? '#667eea' : '#10b981' });
+  chrome.action.setBadgeBackgroundColor({
+    color: remaining > 0 ? '#667eea' : '#10b981',
+  });
 }
 
 async function handlePunchIn() {
   const now = Date.now();
-  
+
   await chrome.storage.local.set({
     punchInTime: now,
     isActive: true,
     breakStartTime: null,
-    totalBreakTime: 0
+    totalBreakTime: 0,
   });
-  
+
   // Create alarm to check for completion
   chrome.alarms.create('checkCompletion', { periodInMinutes: 1 });
-  
+
   // Add to today's log
   await addToTodayLog('Punched In', now);
-  
+
   loadState();
 }
 
 async function handlePunchOut() {
-  const data = await chrome.storage.local.get(['punchInTime', 'totalBreakTime', 'breakStartTime']);
+  const data = await chrome.storage.local.get([
+    'punchInTime',
+    'totalBreakTime',
+    'breakStartTime',
+  ]);
   const now = Date.now();
-  
+
   // If on break, end it first
   let finalBreakTime = data.totalBreakTime || 0;
   if (data.breakStartTime) {
     finalBreakTime += now - data.breakStartTime;
   }
-  
+
   const totalElapsed = now - data.punchInTime;
   const workingTime = totalElapsed - finalBreakTime;
   const earnedAmount = (workingTime / (60 * 60 * 1000)) * HOURLY_RATE;
-  
+
   // Save to history
   await saveToHistory({
     date: new Date().toDateString(),
@@ -231,45 +273,48 @@ async function handlePunchOut() {
     workingTime: workingTime,
     breakTime: finalBreakTime,
     completed: workingTime >= TARGET_MS,
-    earnings: earnedAmount
+    earnings: earnedAmount,
   });
-  
+
   // Add to today's log
   await addToTodayLog('Punched Out', now, workingTime);
-  
+
   // Reset state
   await chrome.storage.local.set({
     isActive: false,
     punchInTime: null,
     breakStartTime: null,
-    totalBreakTime: 0
+    totalBreakTime: 0,
   });
-  
+
   // Clear alarm and badge
   chrome.alarms.clear('checkCompletion');
   chrome.action.setBadgeText({ text: '' });
-  
+
   alert(`Punch out complete. You earned ${formatAmount(earnedAmount)} today.`);
 
   loadState();
 }
 
 async function handleToggleBreak() {
-  const data = await chrome.storage.local.get(['breakStartTime', 'totalBreakTime']);
+  const data = await chrome.storage.local.get([
+    'breakStartTime',
+    'totalBreakTime',
+  ]);
   const now = Date.now();
-  
+
   if (data.breakStartTime) {
     // End break
     const breakDuration = now - data.breakStartTime;
     const newTotalBreak = (data.totalBreakTime || 0) + breakDuration;
-    
+
     await chrome.storage.local.set({
       breakStartTime: null,
-      totalBreakTime: newTotalBreak
+      totalBreakTime: newTotalBreak,
     });
-    
+
     await addToTodayLog('Break Ended', now, breakDuration);
-    
+
     toggleBreakBtn.textContent = '☕ Start Break';
     toggleBreakBtn.classList.remove('on-break');
     statusEl.textContent = 'Currently Working';
@@ -278,34 +323,34 @@ async function handleToggleBreak() {
   } else {
     // Start break
     await chrome.storage.local.set({
-      breakStartTime: now
+      breakStartTime: now,
     });
-    
+
     await addToTodayLog('Break Started', now);
-    
+
     toggleBreakBtn.textContent = '⏸️ End Break';
     toggleBreakBtn.classList.add('on-break');
     statusEl.textContent = 'On Break';
     statusEl.style.color = '#f59e0b';
     breakTimeEl.style.display = 'block';
   }
-  
+
   loadState();
 }
 
 async function addToTodayLog(action, time, duration) {
   const data = await chrome.storage.local.get(['todayLog']);
   const todayLog = data.todayLog || [];
-  
+
   const entry = {
     action: action,
     time: time,
-    duration: duration
+    duration: duration,
   };
-  
+
   todayLog.push(entry);
   await chrome.storage.local.set({ todayLog: todayLog });
-  
+
   displayTodayLog(todayLog);
 }
 
@@ -314,33 +359,36 @@ function displayTodayLog(logs) {
     todayLogEl.textContent = 'No entries yet';
     return;
   }
-  
+
   todayLogEl.innerHTML = '';
-  logs.slice(-5).reverse().forEach(entry => {
-    const div = document.createElement('div');
-    div.className = 'log-entry';
-    
-    const timeStr = formatTime(new Date(entry.time));
-    let content = `<span class="log-entry-time">${entry.action}</span> at ${timeStr}`;
-    
-    if (entry.duration) {
-      content += `<span class="log-entry-duration">(${formatDuration(entry.duration)})</span>`;
-    }
-    
-    div.innerHTML = content;
-    todayLogEl.appendChild(div);
-  });
+  logs
+    .slice(-5)
+    .reverse()
+    .forEach((entry) => {
+      const div = document.createElement('div');
+      div.className = 'log-entry';
+
+      const timeStr = formatTime(new Date(entry.time));
+      let content = `<span class="log-entry-time">${entry.action}</span> at ${timeStr}`;
+
+      if (entry.duration) {
+        content += `<span class="log-entry-duration">(${formatDuration(entry.duration)})</span>`;
+      }
+
+      div.innerHTML = content;
+      todayLogEl.appendChild(div);
+    });
 }
 
 async function saveToHistory(session) {
   const data = await chrome.storage.local.get(['history']);
   const history = data.history || [];
-  
+
   history.unshift(session);
-  
+
   // Keep only last 7 days
   const recentHistory = history.slice(0, 7);
-  
+
   await chrome.storage.local.set({ history: recentHistory });
   displayHistory(recentHistory);
 }
@@ -350,31 +398,32 @@ function displayHistory(history) {
     historyLogEl.textContent = 'No history yet';
     return;
   }
-  
+
   historyLogEl.innerHTML = '';
-  history.forEach(session => {
+  history.forEach((session) => {
     const div = document.createElement('div');
     div.className = 'log-entry';
     if (session.completed) {
       div.classList.add('completed');
     }
-    
+
     const date = new Date(session.punchIn).toLocaleDateString();
     const inTime = formatTime(new Date(session.punchIn));
     const outTime = formatTime(new Date(session.punchOut));
     const duration = formatDuration(session.workingTime);
     const status = session.completed ? '✅' : '⚠️';
-    const earningText = typeof session.earnings === 'number'
-      ? ` | Earned: ${formatAmount(session.earnings)}`
-      : '';
-    
+    const earningText =
+      typeof session.earnings === 'number'
+        ? ` | Earned: ${formatAmount(session.earnings)}`
+        : '';
+
     div.innerHTML = `
       <div><strong>${date}</strong> ${status}</div>
       <div style="font-size: 11px; margin-top: 3px;">
         ${inTime} → ${outTime} (${duration})${earningText}
       </div>
     `;
-    
+
     historyLogEl.appendChild(div);
   });
 }
@@ -384,7 +433,7 @@ function formatDuration(ms) {
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
-  
+
   return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
 }
 
@@ -393,7 +442,7 @@ function formatTime(date) {
   const minutes = date.getMinutes();
   const ampm = hours >= 12 ? 'PM' : 'AM';
   const displayHours = hours % 12 || 12;
-  
+
   return `${displayHours}:${pad(minutes)} ${ampm}`;
 }
 
@@ -404,7 +453,7 @@ function pad(num) {
 function formatAmount(amount) {
   return Number(amount || 0).toLocaleString(undefined, {
     minimumFractionDigits: 2,
-    maximumFractionDigits: 2
+    maximumFractionDigits: 2,
   });
 }
 
@@ -422,7 +471,8 @@ async function loadSettings() {
   } else {
     TARGET_HOURS = 8.5; // Default
   }
-  MONTHLY_SALARY = typeof data.monthlySalary === 'number' ? data.monthlySalary : 0;
+  MONTHLY_SALARY =
+    typeof data.monthlySalary === 'number' ? data.monthlySalary : 0;
   TARGET_MS = TARGET_HOURS * 60 * 60 * 1000;
   targetHoursInput.value = TARGET_HOURS;
   monthlySalaryInput.value = MONTHLY_SALARY;
@@ -442,32 +492,41 @@ function toggleSettings() {
 async function saveSettings() {
   const newTargetHours = parseFloat(targetHoursInput.value);
   const newMonthlySalary = parseFloat(monthlySalaryInput.value);
-  
+
   if (isNaN(newTargetHours) || newTargetHours < 1 || newTargetHours > 24) {
-    showSettingsMessage('Please enter a valid number between 1 and 24', 'error');
+    showSettingsMessage(
+      'Please enter a valid number between 1 and 24',
+      'error'
+    );
     return;
   }
   if (isNaN(newMonthlySalary) || newMonthlySalary < 0) {
-    showSettingsMessage('Please enter a valid monthly salary (0 or greater)', 'error');
+    showSettingsMessage(
+      'Please enter a valid monthly salary (0 or greater)',
+      'error'
+    );
     return;
   }
-  
+
   TARGET_HOURS = newTargetHours;
   MONTHLY_SALARY = newMonthlySalary;
   TARGET_MS = TARGET_HOURS * 60 * 60 * 1000;
   recalculateSalaryRates();
-  
-  await chrome.storage.local.set({ 
+
+  await chrome.storage.local.set({
     targetHours: TARGET_HOURS,
-    monthlySalary: MONTHLY_SALARY
+    monthlySalary: MONTHLY_SALARY,
   });
   targetDisplayEl.textContent = `${TARGET_HOURS} hours`;
-  
+
   // Notify background script of the change
-  chrome.runtime.sendMessage({ action: 'updateTargetHours', targetHours: TARGET_HOURS });
-  
+  chrome.runtime.sendMessage({
+    action: 'updateTargetHours',
+    targetHours: TARGET_HOURS,
+  });
+
   showSettingsMessage('Settings saved successfully!', 'success');
-  
+
   // Update display with new target
   updateDisplay();
 }
@@ -476,7 +535,7 @@ function showSettingsMessage(message, type) {
   settingsMessageEl.textContent = message;
   settingsMessageEl.className = `settings-message ${type}`;
   settingsMessageEl.style.display = 'block';
-  
+
   setTimeout(() => {
     settingsMessageEl.style.display = 'none';
   }, 3000);
@@ -485,11 +544,11 @@ function showSettingsMessage(message, type) {
 // Manual Entry Modal functions
 function openManualModal() {
   manualModal.style.display = 'flex';
-  
+
   // Pre-fill with current time if not punched in
   const now = new Date();
   const timeString = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
-  
+
   if (!manualPunchInInput.value) {
     manualPunchInInput.value = timeString;
   }
@@ -505,38 +564,38 @@ async function saveManualEntry() {
   const punchInTime = manualPunchInInput.value;
   const punchOutTime = manualPunchOutInput.value;
   const dateStr = manualDateInput.value;
-  
+
   if (!punchInTime) {
     alert('Please enter a punch in time');
     return;
   }
-  
+
   // Parse the date and time
   const [year, month, day] = dateStr.split('-').map(Number);
   const [inHour, inMinute] = punchInTime.split(':').map(Number);
-  
+
   const punchInDate = new Date(year, month - 1, day, inHour, inMinute);
   const punchInMs = punchInDate.getTime();
-  
+
   // Check if this is for today
   const today = new Date().toDateString();
   const entryDate = punchInDate.toDateString();
   const isToday = today === entryDate;
-  
+
   if (punchOutTime) {
     // Complete entry with both punch in and out
     const [outHour, outMinute] = punchOutTime.split(':').map(Number);
     const punchOutDate = new Date(year, month - 1, day, outHour, outMinute);
     const punchOutMs = punchOutDate.getTime();
-    
+
     if (punchOutMs <= punchInMs) {
       alert('Punch out time must be after punch in time');
       return;
     }
-    
+
     const workingTime = punchOutMs - punchInMs;
     const earnedAmount = (workingTime / (60 * 60 * 1000)) * HOURLY_RATE;
-    
+
     // Save to history
     await saveToHistory({
       date: entryDate,
@@ -546,14 +605,16 @@ async function saveManualEntry() {
       breakTime: 0,
       completed: workingTime >= TARGET_MS,
       earnings: earnedAmount,
-      manual: true
+      manual: true,
     });
-    
+
     if (isToday) {
       await addToTodayLog('Manual Entry', punchInMs, workingTime);
     }
-    
-    alert(`Manual entry saved. Estimated earning: ${formatAmount(earnedAmount)}`);
+
+    alert(
+      `Manual entry saved. Estimated earning: ${formatAmount(earnedAmount)}`
+    );
   } else {
     // Only punch in - start active session
     if (isToday) {
@@ -561,19 +622,21 @@ async function saveManualEntry() {
         punchInTime: punchInMs,
         isActive: true,
         breakStartTime: null,
-        totalBreakTime: 0
+        totalBreakTime: 0,
       });
-      
+
       chrome.alarms.create('checkCompletion', { periodInMinutes: 1 });
       await addToTodayLog('Manual Punch In', punchInMs);
-      
+
       alert('Started active session with manual punch in time!');
     } else {
-      alert('Cannot start active session for past dates. Please add both punch in and out times for historical entries.');
+      alert(
+        'Cannot start active session for past dates. Please add both punch in and out times for historical entries.'
+      );
       return;
     }
   }
-  
+
   closeManualModal();
   loadState();
 }
@@ -584,11 +647,11 @@ function openEditPunchInModal() {
     if (!data.isActive || !data.punchInTime) {
       return;
     }
-    
+
     const punchInDate = new Date(data.punchInTime);
     const timeString = `${pad(punchInDate.getHours())}:${pad(punchInDate.getMinutes())}`;
     editPunchInInput.value = timeString;
-    
+
     editPunchInModal.style.display = 'flex';
   });
 }
@@ -599,15 +662,15 @@ function closeEditPunchInModal() {
 
 async function savePunchInEdit() {
   const newTime = editPunchInInput.value;
-  
+
   if (!newTime) {
     alert('Please enter a valid time');
     return;
   }
-  
+
   const data = await chrome.storage.local.get(['punchInTime']);
   const oldPunchInDate = new Date(data.punchInTime);
-  
+
   const [hour, minute] = newTime.split(':').map(Number);
   const newPunchInDate = new Date(
     oldPunchInDate.getFullYear(),
@@ -616,21 +679,21 @@ async function savePunchInEdit() {
     hour,
     minute
   );
-  
+
   const newPunchInMs = newPunchInDate.getTime();
-  
+
   // Make sure new time is not in the future
   if (newPunchInMs > Date.now()) {
     alert('Punch in time cannot be in the future');
     return;
   }
-  
+
   await chrome.storage.local.set({
-    punchInTime: newPunchInMs
+    punchInTime: newPunchInMs,
   });
-  
+
   await addToTodayLog('Edited Punch In Time', newPunchInMs);
-  
+
   closeEditPunchInModal();
   loadState();
 }
