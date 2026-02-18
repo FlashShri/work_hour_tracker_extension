@@ -13,7 +13,7 @@ let estimatedOutEl, estimatedOutValueEl;
 let breakTimeEl, breakDurationEl;
 let todayLogEl, historyLogEl;
 let targetDisplayEl, dailySalaryDisplayEl, earnedTodayDisplayEl;
-
+let notificationEmailInput;
 // Modal elements
 let manualModal, editPunchInModal;
 let manualPunchInInput, manualPunchOutInput, manualDateInput;
@@ -46,6 +46,7 @@ function init() {
   targetDisplayEl = document.getElementById('targetDisplay');
   dailySalaryDisplayEl = document.getElementById('dailySalaryDisplay');
   earnedTodayDisplayEl = document.getElementById('earnedTodayDisplay');
+  notificationEmailInput = document.getElementById('notificationEmail');
 
   // Modal elements
   manualModal = document.getElementById('manualModal');
@@ -244,6 +245,18 @@ async function handlePunchIn() {
   // Add to today's log
   await addToTodayLog('Punched In', now);
 
+  const settings = await chrome.storage.local.get(['notificationEmail']);
+
+  fetch('https://work-hours-email-backend.onrender.com/api/notify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      type: 'PUNCH_IN',
+      email: settings.notificationEmail,
+      punchInTime: new Date(now).toLocaleTimeString(),
+    }),
+  }).catch((err) => console.error('Email error:', err));
+
   loadState();
 }
 
@@ -264,6 +277,22 @@ async function handlePunchOut() {
   const totalElapsed = now - data.punchInTime;
   const workingTime = totalElapsed - finalBreakTime;
   const earnedAmount = calculateEarnedAmount(workingTime);
+
+  const settings = await chrome.storage.local.get(['notificationEmail']);
+
+  fetch('https://work-hours-email-backend.onrender.com/api/notify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      type: 'PUNCH_OUT',
+      email: settings.notificationEmail,
+      punchInTime: formatTime(new Date(data.punchInTime)),
+      punchOutTime: formatTime(new Date(now)),
+      workingHours: formatDuration(workingTime),
+      breakTime: formatDuration(finalBreakTime),
+      earnings: earnedAmount.toFixed(2),
+    }),
+  }).catch((err) => console.error('Email error:', err));
 
   // Save to history
   await saveToHistory({
@@ -471,7 +500,12 @@ function recalculateSalaryRates() {
 
 // Load settings from storage
 async function loadSettings() {
-  const data = await chrome.storage.local.get(['targetHours', 'monthlySalary']);
+  const data = await chrome.storage.local.get([
+    'targetHours',
+    'monthlySalary',
+    'notificationEmail',
+  ]);
+  notificationEmailInput.value = data.notificationEmail || '';
   if (data.targetHours) {
     TARGET_HOURS = data.targetHours;
   } else {
@@ -498,7 +532,12 @@ function toggleSettings() {
 async function saveSettings() {
   const newTargetHours = parseFloat(targetHoursInput.value);
   const newMonthlySalary = parseFloat(monthlySalaryInput.value);
+  const newNotificationEmail = notificationEmailInput.value.trim();
 
+  if (!newNotificationEmail) {
+    showSettingsMessage('Please enter a valid email address', 'error');
+    return;
+  }
   if (isNaN(newTargetHours) || newTargetHours < 1 || newTargetHours > 24) {
     showSettingsMessage(
       'Please enter a valid number between 1 and 24',
@@ -522,7 +561,9 @@ async function saveSettings() {
   await chrome.storage.local.set({
     targetHours: TARGET_HOURS,
     monthlySalary: MONTHLY_SALARY,
+    notificationEmail: newNotificationEmail,
   });
+
   targetDisplayEl.textContent = `${TARGET_HOURS} hours`;
 
   // Notify background script of the change

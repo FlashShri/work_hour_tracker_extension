@@ -1,145 +1,183 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-  <meta charset="UTF-8">
-  <title>Work Hours Tracker</title>
-  <link rel="stylesheet" href="styles.css">
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h2>⏰ Work Hours Tracker</h2>
-    </div>
-    
-    <div class="status-section">
-      <div id="status" class="status">Not Punched In</div>
-      <div id="timer" class="timer">00:00:00</div>
-      <div id="remaining" class="remaining"></div>
-    </div>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Work Hours Tracker</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h2>⏰ Work Hours Tracker</h2>
+      </div>
 
-    <div class="button-section">
-      <button id="punchIn" class="btn btn-primary">🟢 Punch In</button>
-      <button id="punchOut" class="btn btn-secondary" disabled>🔴 Punch Out</button>
-      <button id="manualEntry" class="btn btn-manual">✏️ Manual Entry</button>
-    </div>
+      <div class="status-section">
+        <div id="status" class="status">Not Punched In</div>
+        <div id="timer" class="timer">00:00:00</div>
+        <div id="remaining" class="remaining"></div>
+      </div>
 
-    <!-- Manual Entry Modal -->
-    <div id="manualModal" class="modal" style="display: none;">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h3>✏️ Manual Time Entry</h3>
-          <button id="closeModal" class="close-btn">×</button>
+      <div class="button-section">
+        <button id="punchIn" class="btn btn-primary">🟢 Punch In</button>
+        <button id="punchOut" class="btn btn-secondary" disabled>
+          🔴 Punch Out
+        </button>
+        <button id="manualEntry" class="btn btn-manual">✏️ Manual Entry</button>
+      </div>
+
+      <!-- Manual Entry Modal -->
+      <div id="manualModal" class="modal" style="display: none">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3>✏️ Manual Time Entry</h3>
+            <button id="closeModal" class="close-btn">×</button>
+          </div>
+          <div class="modal-body">
+            <div class="input-group">
+              <label>Punch In Time:</label>
+              <input type="time" id="manualPunchIn" class="time-input" />
+            </div>
+            <div class="input-group">
+              <label>Punch Out Time (optional):</label>
+              <input type="time" id="manualPunchOut" class="time-input" />
+            </div>
+            <div class="input-group">
+              <label>Date:</label>
+              <input type="date" id="manualDate" class="time-input" />
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button id="saveManual" class="btn btn-primary">
+              💾 Save Entry
+            </button>
+            <button id="cancelModal" class="btn btn-secondary">Cancel</button>
+          </div>
         </div>
-        <div class="modal-body">
+      </div>
+
+      <!-- Settings Section -->
+      <div class="settings-section">
+        <button id="toggleSettings" class="settings-toggle">⚙️ Settings</button>
+        <div id="settingsPanel" class="settings-panel" style="display: none">
           <div class="input-group">
-            <label>Punch In Time:</label>
-            <input type="time" id="manualPunchIn" class="time-input">
+            <label>Target Hours Per Day:</label>
+            <div class="target-input-group">
+              <input
+                type="number"
+                id="targetHours"
+                min="1"
+                max="24"
+                step="0.5"
+                value="8.5"
+                class="number-input"
+              />
+              <span class="input-suffix">hours</span>
+            </div>
           </div>
           <div class="input-group">
-            <label>Punch Out Time (optional):</label>
-            <input type="time" id="manualPunchOut" class="time-input">
+            <label>Monthly Salary:</label>
+            <div class="target-input-group">
+              <input
+                type="number"
+                id="monthlySalary"
+                min="0"
+                step="0.01"
+                value="0"
+                class="number-input"
+              />
+              <span class="input-suffix">per month</span>
+            </div>
           </div>
+
           <div class="input-group">
-            <label>Date:</label>
-            <input type="date" id="manualDate" class="time-input">
+            <label>Notification Email:</label>
+            <input
+              type="email"
+              id="notificationEmail"
+              class="number-input"
+              placeholder="Enter your email"
+            />
+          </div>
+
+          <button id="saveSettings" class="btn btn-primary">
+            💾 Save Settings
+          </button>
+          <div id="settingsMessage" class="settings-message"></div>
+        </div>
+      </div>
+
+      <div class="info-section">
+        <div class="info-row">
+          <span class="label">Target Hours:</span>
+          <span id="targetDisplay" class="value">8.5 hours</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Daily Salary (Salary/30):</span>
+          <span id="dailySalaryDisplay" class="value">0.00</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Earned Today:</span>
+          <span id="earnedTodayDisplay" class="value">0.00</span>
+        </div>
+        <div id="punchInTime" class="info-row" style="display: none">
+          <span class="label">Punched In:</span>
+          <span id="punchInValue" class="value editable" title="Click to edit"
+            >--:--</span
+          >
+          <button id="editPunchIn" class="edit-btn" style="display: none">
+            ✏️
+          </button>
+        </div>
+        <div id="estimatedOut" class="info-row" style="display: none">
+          <span class="label">Est. Punch Out:</span>
+          <span id="estimatedOutValue" class="value">--:--</span>
+        </div>
+      </div>
+
+      <!-- Edit Punch In Modal -->
+      <div id="editPunchInModal" class="modal" style="display: none">
+        <div class="modal-content modal-small">
+          <div class="modal-header">
+            <h3>Edit Punch In Time</h3>
+            <button id="closePunchInModal" class="close-btn">×</button>
+          </div>
+          <div class="modal-body">
+            <div class="input-group">
+              <label>New Punch In Time:</label>
+              <input type="time" id="editPunchInInput" class="time-input" />
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button id="savePunchInEdit" class="btn btn-primary">
+              💾 Update
+            </button>
+            <button id="cancelPunchInEdit" class="btn btn-secondary">
+              Cancel
+            </button>
           </div>
         </div>
-        <div class="modal-footer">
-          <button id="saveManual" class="btn btn-primary">💾 Save Entry</button>
-          <button id="cancelModal" class="btn btn-secondary">Cancel</button>
+      </div>
+
+      <div class="break-section">
+        <button id="toggleBreak" class="btn btn-break" disabled>
+          ☕ Start Break
+        </button>
+        <div id="breakTime" class="break-time" style="display: none">
+          Break Time: <span id="breakDuration">00:00</span>
         </div>
+      </div>
+
+      <div class="history-section">
+        <h3>📊 Today's Log</h3>
+        <div id="todayLog" class="log-content">No entries yet</div>
+      </div>
+
+      <div class="history-section">
+        <h3>📅 Recent History</h3>
+        <div id="historyLog" class="log-content">No history yet</div>
       </div>
     </div>
 
-    <!-- Settings Section -->
-    <div class="settings-section">
-      <button id="toggleSettings" class="settings-toggle">⚙️ Settings</button>
-      <div id="settingsPanel" class="settings-panel" style="display: none;">
-        <div class="input-group">
-          <label>Target Hours Per Day:</label>
-          <div class="target-input-group">
-            <input type="number" id="targetHours" min="1" max="24" step="0.5" value="8.5" class="number-input">
-            <span class="input-suffix">hours</span>
-          </div>
-        </div>
-        <div class="input-group">
-          <label>Monthly Salary:</label>
-          <div class="target-input-group">
-            <input type="number" id="monthlySalary" min="0" step="0.01" value="0" class="number-input">
-            <span class="input-suffix">per month</span>
-          </div>
-        </div>
-        <button id="saveSettings" class="btn btn-primary">💾 Save Settings</button>
-        <div id="settingsMessage" class="settings-message"></div>
-      </div>
-    </div>
-
-    <div class="info-section">
-      <div class="info-row">
-        <span class="label">Target Hours:</span>
-        <span id="targetDisplay" class="value">8.5 hours</span>
-      </div>
-      <div class="info-row">
-        <span class="label">Daily Salary (Salary/30):</span>
-        <span id="dailySalaryDisplay" class="value">0.00</span>
-      </div>
-      <div class="info-row">
-        <span class="label">Earned Today:</span>
-        <span id="earnedTodayDisplay" class="value">0.00</span>
-      </div>
-      <div id="punchInTime" class="info-row" style="display: none;">
-        <span class="label">Punched In:</span>
-        <span id="punchInValue" class="value editable" title="Click to edit">--:--</span>
-        <button id="editPunchIn" class="edit-btn" style="display: none;">✏️</button>
-      </div>
-      <div id="estimatedOut" class="info-row" style="display: none;">
-        <span class="label">Est. Punch Out:</span>
-        <span id="estimatedOutValue" class="value">--:--</span>
-      </div>
-    </div>
-
-    <!-- Edit Punch In Modal -->
-    <div id="editPunchInModal" class="modal" style="display: none;">
-      <div class="modal-content modal-small">
-        <div class="modal-header">
-          <h3>Edit Punch In Time</h3>
-          <button id="closePunchInModal" class="close-btn">×</button>
-        </div>
-        <div class="modal-body">
-          <div class="input-group">
-            <label>New Punch In Time:</label>
-            <input type="time" id="editPunchInInput" class="time-input">
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button id="savePunchInEdit" class="btn btn-primary">💾 Update</button>
-          <button id="cancelPunchInEdit" class="btn btn-secondary">Cancel</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="break-section">
-      <button id="toggleBreak" class="btn btn-break" disabled>☕ Start Break</button>
-      <div id="breakTime" class="break-time" style="display: none;">
-        Break Time: <span id="breakDuration">00:00</span>
-      </div>
-    </div>
-
-    <div class="history-section">
-      <h3>📊 Today's Log</h3>
-      <div id="todayLog" class="log-content">
-        No entries yet
-      </div>
-    </div>
-
-    <div class="history-section">
-      <h3>📅 Recent History</h3>
-      <div id="historyLog" class="log-content">
-        No history yet
-      </div>
-    </div>
-  </div>
-  
-  <script src="popup.js"></script>
-</body>
+    <script src="popup.js"></script>
+  </body>
 </html>

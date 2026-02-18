@@ -135,6 +135,14 @@ async function checkAndNotify() {
       requireInteraction: true,
     });
 
+    fetch('https://work-hours-email-backend.onrender.com/api/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'TARGET_COMPLETED',
+      }),
+    }).catch((err) => console.error('Email error:', err));
+
     await chrome.storage.local.set({ notified8_5: true });
     if (!hasPlayedCompletionSound) {
       playCompletionSound();
