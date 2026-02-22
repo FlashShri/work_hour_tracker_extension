@@ -10,10 +10,11 @@ let punchInBtn, punchOutBtn, toggleBreakBtn, manualEntryBtn;
 let statusEl, timerEl, remainingEl;
 let punchInTimeEl, punchInValueEl;
 let estimatedOutEl, estimatedOutValueEl;
-let breakTimeEl, breakDurationEl;
+let breakTimeEl, breakDurationEl, breakCatLabel, breakCategorySelect;
 let todayLogEl, historyLogEl;
 let targetDisplayEl, dailySalaryDisplayEl, earnedTodayDisplayEl;
 let notificationEmailInput;
+let weeklyTotalHoursEl, weeklyTotalEarnedEl, exportCsvBtn;
 // Modal elements
 let manualModal, editPunchInModal;
 let manualPunchInInput, manualPunchOutInput, manualDateInput;
@@ -22,6 +23,54 @@ let settingsPanel, targetHoursInput, monthlySalaryInput, settingsMessageEl;
 
 // State
 let updateInterval;
+
+// ── Toast Notification System ────────────────────────────────
+// showToast(message, type, duration)
+// type: 'success' | 'error' | 'info' | 'warning'
+function showToast(message, type = 'info', duration = 3500) {
+  const container = document.getElementById('toastContainer');
+  if (!container) return;
+
+  const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
+
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.innerHTML = `<span class="toast-icon">${icons[type] || 'ℹ️'}</span><span>${message}</span>`;
+
+  container.appendChild(toast);
+
+  const remove = () => {
+    toast.classList.add('hiding');
+    toast.addEventListener('animationend', () => toast.remove(), { once: true });
+  };
+
+  const timer = setTimeout(remove, duration);
+  toast.addEventListener('click', () => { clearTimeout(timer); remove(); });
+}
+
+// ── Tab Switching ─────────────────────────────────────────────
+function initTabs() {
+  document.querySelectorAll('.tab-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const tabId = btn.dataset.tab;
+      document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach((p) => (p.style.display = 'none'));
+      btn.classList.add('active');
+      document.getElementById(`tab-${tabId}`).style.display = 'block';
+    });
+  });
+}
+
+// ── Progress Ring ─────────────────────────────────────────────
+const RING_CIRCUMFERENCE = 427.26; // 2π × r68
+
+function updateProgressRing(percent) {
+  const fill = document.getElementById('progressRingFill');
+  if (!fill) return;
+  const clamped = Math.max(0, Math.min(1, percent));
+  fill.style.strokeDashoffset = RING_CIRCUMFERENCE * (1 - clamped);
+  fill.style.stroke = clamped >= 1 ? 'var(--success)' : 'var(--accent)';
+}
 
 // Initialize
 document.addEventListener('DOMContentLoaded', init);
@@ -41,12 +90,17 @@ function init() {
   estimatedOutValueEl = document.getElementById('estimatedOutValue');
   breakTimeEl = document.getElementById('breakTime');
   breakDurationEl = document.getElementById('breakDuration');
+  breakCatLabel = document.getElementById('breakCatLabel');
+  breakCategorySelect = document.getElementById('breakCategory');
   todayLogEl = document.getElementById('todayLog');
   historyLogEl = document.getElementById('historyLog');
   targetDisplayEl = document.getElementById('targetDisplay');
   dailySalaryDisplayEl = document.getElementById('dailySalaryDisplay');
   earnedTodayDisplayEl = document.getElementById('earnedTodayDisplay');
   notificationEmailInput = document.getElementById('notificationEmail');
+  weeklyTotalHoursEl = document.getElementById('weeklyTotalHours');
+  weeklyTotalEarnedEl = document.getElementById('weeklyTotalEarned');
+  exportCsvBtn = document.getElementById('exportCsvBtn');
 
   // Modal elements
   manualModal = document.getElementById('manualModal');
@@ -65,6 +119,18 @@ function init() {
   punchOutBtn.addEventListener('click', handlePunchOut);
   toggleBreakBtn.addEventListener('click', handleToggleBreak);
   manualEntryBtn.addEventListener('click', openManualModal);
+
+  // Keyboard Shortcuts (Ctrl+Shift+P or Cmd+Shift+P)
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'p' || e.key === 'P')) {
+      e.preventDefault();
+      if (!punchInBtn.disabled) {
+        handlePunchIn();
+      } else if (!punchOutBtn.disabled) {
+        handlePunchOut();
+      }
+    }
+  });
 
   // Manual entry modal
   document
@@ -89,13 +155,29 @@ function init() {
     .getElementById('savePunchInEdit')
     .addEventListener('click', savePunchInEdit);
 
-  // Settings
-  document
-    .getElementById('toggleSettings')
-    .addEventListener('click', toggleSettings);
+  // Settings (in tab — just wire up save button)
   document
     .getElementById('saveSettings')
     .addEventListener('click', saveSettings);
+
+  // Init tabs
+  initTabs();
+
+  // Punch Out Confirmation Modal
+  document
+    .getElementById('confirmPunchOutYes')
+    .addEventListener('click', () => {
+      document.getElementById('punchOutConfirmModal').style.display = 'none';
+      performPunchOut();
+    });
+  document
+    .getElementById('confirmPunchOutNo')
+    .addEventListener('click', () => {
+      document.getElementById('punchOutConfirmModal').style.display = 'none';
+    });
+
+  // Export CSV
+  exportCsvBtn.addEventListener('click', exportHistoryToCsv);
 
   // Set default date to today
   const today = new Date().toISOString().split('T')[0];
@@ -145,9 +227,10 @@ async function loadState() {
     if (data.breakStartTime) {
       toggleBreakBtn.textContent = '⏸️ End Break';
       toggleBreakBtn.classList.add('on-break');
+      breakCatLabel.textContent = `On Break (${data.currentBreakCategory || 'General'})`;
       breakTimeEl.style.display = 'block';
       statusEl.textContent = 'On Break';
-      statusEl.style.color = '#f59e0b';
+      statusEl.style.color = 'var(--warning)';
     }
   } else {
     // No active session
@@ -156,11 +239,12 @@ async function loadState() {
     toggleBreakBtn.disabled = true;
 
     statusEl.textContent = 'Not Punched In';
-    statusEl.style.color = '#657786';
+    statusEl.style.color = 'var(--text-3)';
 
     punchInTimeEl.style.display = 'none';
     estimatedOutEl.style.display = 'none';
     breakTimeEl.style.display = 'none';
+    updateProgressRing(0);
   }
 
   // Load history
@@ -181,6 +265,7 @@ async function updateDisplay() {
     timerEl.textContent = '00:00:00';
     remainingEl.textContent = '';
     earnedTodayDisplayEl.textContent = formatAmount(0);
+    updateProgressRing(0);
     return;
   }
 
@@ -206,15 +291,16 @@ async function updateDisplay() {
   const earned = calculateEarnedAmount(workingTime);
   earnedTodayDisplayEl.textContent = formatAmount(earned);
 
-  // Update remaining time
+  // Update remaining time + ring
   const remaining = TARGET_MS - workingTime;
+  updateProgressRing(workingTime / TARGET_MS);
   if (remaining > 0) {
-    remainingEl.textContent = `${formatDuration(remaining)} remaining`;
-    remainingEl.style.color = '#657786';
+    remainingEl.textContent = `${formatDuration(remaining)} left`;
+    remainingEl.style.color = 'var(--text-3)';
   } else {
     const overtime = Math.abs(remaining);
-    remainingEl.textContent = `✅ Completed! +${formatDuration(overtime)} overtime`;
-    remainingEl.style.color = '#10b981';
+    remainingEl.textContent = `+${formatDuration(overtime)} overtime`;
+    remainingEl.style.color = 'var(--success)';
   }
 
   // 🔥 Instant completion check when popup is open
@@ -244,6 +330,7 @@ async function handlePunchIn() {
 
   // Add to today's log
   await addToTodayLog('Punched In', now);
+  showToast('Punched in! Timer started.', 'success');
 
   const settings = await chrome.storage.local.get(['notificationEmail']);
 
@@ -260,7 +347,15 @@ async function handlePunchIn() {
   loadState();
 }
 
-async function handlePunchOut() {
+// Show confirm modal before punching out
+function handlePunchOut() {
+  const modal = document.getElementById('punchOutConfirmModal');
+  const msg = document.getElementById('punchOutConfirmMsg');
+  msg.textContent = 'Are you sure you want to punch out?';
+  modal.style.display = 'flex';
+}
+
+async function performPunchOut() {
   const data = await chrome.storage.local.get([
     'punchInTime',
     'totalBreakTime',
@@ -320,7 +415,11 @@ async function handlePunchOut() {
   chrome.alarms.clear('checkCompletion');
   chrome.action.setBadgeText({ text: '' });
 
-  alert(`Punch out complete. You earned ${formatAmount(earnedAmount)} today.`);
+  showToast(
+    `Punched out! You worked ${formatDuration(workingTime)} and earned ${formatAmount(earnedAmount)} today.`,
+    'success',
+    5000
+  );
 
   loadState();
 }
@@ -347,20 +446,23 @@ async function handleToggleBreak() {
     toggleBreakBtn.textContent = '☕ Start Break';
     toggleBreakBtn.classList.remove('on-break');
     statusEl.textContent = 'Currently Working';
-    statusEl.style.color = '#10b981';
+    statusEl.style.color = 'var(--success)';
     breakTimeEl.style.display = 'none';
   } else {
     // Start break
+    const category = breakCategorySelect.value;
     await chrome.storage.local.set({
       breakStartTime: now,
+      currentBreakCategory: category
     });
 
-    await addToTodayLog('Break Started', now);
+    await addToTodayLog(`Break Started (${category})`, now);
 
     toggleBreakBtn.textContent = '⏸️ End Break';
     toggleBreakBtn.classList.add('on-break');
+    breakCatLabel.textContent = `On Break (${category})`;
     statusEl.textContent = 'On Break';
-    statusEl.style.color = '#f59e0b';
+    statusEl.style.color = 'var(--warning)';
     breakTimeEl.style.display = 'block';
   }
 
@@ -411,15 +513,20 @@ function displayTodayLog(logs) {
 
 async function saveToHistory(session) {
   const data = await chrome.storage.local.get(['history']);
-  const history = data.history || [];
+  let history = data.history || [];
 
   history.unshift(session);
 
-  // Keep only last 7 days
-  const recentHistory = history.slice(0, 7);
+  // Keep entries from the last 7 days (limit to 50 to bound storage)
+  const now = new Date();
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(now.getDate() - 7);
+  const sevenDaysAgoMs = sevenDaysAgo.getTime();
 
-  await chrome.storage.local.set({ history: recentHistory });
-  displayHistory(recentHistory);
+  history = history.filter((s) => s.punchIn >= sevenDaysAgoMs).slice(0, 50);
+
+  await chrome.storage.local.set({ history: history });
+  displayHistory(history);
 }
 
 function displayHistory(history) {
@@ -455,6 +562,78 @@ function displayHistory(history) {
 
     historyLogEl.appendChild(div);
   });
+
+  updateWeeklySummary(history);
+}
+
+function updateWeeklySummary(history) {
+  if (!weeklyTotalHoursEl || !weeklyTotalEarnedEl) return;
+
+  const now = new Date();
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(now.getDate() - 7);
+  const sevenDaysAgoMs = sevenDaysAgo.getTime();
+
+  let totalMs = 0;
+  let totalEarned = 0;
+
+  history.forEach(session => {
+    if (session.punchIn >= sevenDaysAgoMs) {
+      totalMs += session.workingTime || 0;
+      totalEarned += session.earnings || 0;
+    }
+  });
+
+  weeklyTotalHoursEl.textContent = formatDurationShort(totalMs);
+  weeklyTotalEarnedEl.textContent = `Earned: ${formatAmount(totalEarned)}`;
+}
+
+function formatDurationShort(ms) {
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  return `${hours}h ${minutes}m`;
+}
+
+async function exportHistoryToCsv() {
+  const data = await chrome.storage.local.get(['history']);
+  const history = data.history || [];
+
+  if (history.length === 0) {
+    showToast('No history to export', 'warning');
+    return;
+  }
+
+  // Create CSV content
+  const headers = ['Date', 'Punch In', 'Punch Out', 'Working Time', 'Break Time', 'Completed Target', 'Earnings (Manual)', 'Manual Entry'];
+  const rows = history.map(session => [
+    new Date(session.punchIn).toLocaleDateString(),
+    formatTime(new Date(session.punchIn)),
+    session.punchOut ? formatTime(new Date(session.punchOut)) : 'N/A',
+    formatDuration(session.workingTime || 0),
+    formatDuration(session.breakTime || 0),
+    session.completed ? 'Yes' : 'No',
+    session.earnings ? session.earnings.toFixed(2) : '0.00',
+    session.manual ? 'Yes' : 'No'
+  ]);
+
+  let csvContent = headers.join(',') + '\n';
+  rows.forEach(row => {
+    csvContent += row.map(val => `"${val}"`).join(',') + '\n';
+  });
+
+  // Create a Blob and trigger download
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', `work-hours-history-${new Date().toISOString().split('T')[0]}.csv`);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  showToast('CSV Exported Successfully!', 'success');
 }
 
 function formatDuration(ms) {
@@ -516,26 +695,20 @@ async function loadSettings() {
   TARGET_MS = TARGET_HOURS * 60 * 60 * 1000;
   targetHoursInput.value = TARGET_HOURS;
   monthlySalaryInput.value = MONTHLY_SALARY;
-  targetDisplayEl.textContent = `${TARGET_HOURS} hours`;
+  targetDisplayEl.textContent = `${TARGET_HOURS}h`;
   recalculateSalaryRates();
 }
 
 // Settings functions
-function toggleSettings() {
-  if (settingsPanel.style.display === 'none') {
-    settingsPanel.style.display = 'block';
-  } else {
-    settingsPanel.style.display = 'none';
-  }
-}
 
 async function saveSettings() {
   const newTargetHours = parseFloat(targetHoursInput.value);
   const newMonthlySalary = parseFloat(monthlySalaryInput.value);
   const newNotificationEmail = notificationEmailInput.value.trim();
 
-  if (!newNotificationEmail) {
-    showSettingsMessage('Please enter a valid email address', 'error');
+  // Email is optional — only validate format if provided
+  if (newNotificationEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newNotificationEmail)) {
+    showSettingsMessage('Please enter a valid email address (or leave blank)', 'error');
     return;
   }
   if (isNaN(newTargetHours) || newTargetHours < 1 || newTargetHours > 24) {
@@ -564,7 +737,7 @@ async function saveSettings() {
     notificationEmail: newNotificationEmail,
   });
 
-  targetDisplayEl.textContent = `${TARGET_HOURS} hours`;
+  targetDisplayEl.textContent = `${TARGET_HOURS}h`;
 
   // Notify background script of the change
   chrome.runtime.sendMessage({
@@ -613,7 +786,7 @@ async function saveManualEntry() {
   const dateStr = manualDateInput.value;
 
   if (!punchInTime) {
-    alert('Please enter a punch in time');
+    showToast('Please enter a punch in time', 'error');
     return;
   }
 
@@ -636,7 +809,7 @@ async function saveManualEntry() {
     const punchOutMs = punchOutDate.getTime();
 
     if (punchOutMs <= punchInMs) {
-      alert('Punch out time must be after punch in time');
+      showToast('Punch out time must be after punch in time', 'error');
       return;
     }
 
@@ -659,9 +832,7 @@ async function saveManualEntry() {
       await addToTodayLog('Manual Entry', punchInMs, workingTime);
     }
 
-    alert(
-      `Manual entry saved. Estimated earning: ${formatAmount(earnedAmount)}`
-    );
+    showToast(`Manual entry saved. Earned: ${formatAmount(earnedAmount)}`, 'success', 4500);
   } else {
     // Only punch in - start active session
     if (isToday) {
@@ -675,10 +846,12 @@ async function saveManualEntry() {
       chrome.alarms.create('checkCompletion', { periodInMinutes: 1 });
       await addToTodayLog('Manual Punch In', punchInMs);
 
-      alert('Started active session with manual punch in time!');
+      showToast('Active session started with manual punch-in time!', 'success');
     } else {
-      alert(
-        'Cannot start active session for past dates. Please add both punch in and out times for historical entries.'
+      showToast(
+        'For past dates, please provide both punch-in and punch-out times.',
+        'warning',
+        4500
       );
       return;
     }
@@ -711,7 +884,7 @@ async function savePunchInEdit() {
   const newTime = editPunchInInput.value;
 
   if (!newTime) {
-    alert('Please enter a valid time');
+    showToast('Please enter a valid time', 'error');
     return;
   }
 
@@ -731,7 +904,7 @@ async function savePunchInEdit() {
 
   // Make sure new time is not in the future
   if (newPunchInMs > Date.now()) {
-    alert('Punch in time cannot be in the future');
+    showToast('Punch-in time cannot be in the future', 'error');
     return;
   }
 

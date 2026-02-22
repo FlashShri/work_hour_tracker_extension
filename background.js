@@ -25,21 +25,32 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 function playCompletionSound() {
   chrome.tts.getVoices(function (voices) {
-    // Specifically target Kalpana by name
-    const hindiVoice = voices.find(
+    // Prefer Kalpana (Hindi) if available, otherwise fall back to any voice
+    const preferredVoice = voices.find(
       (v) => v.voiceName === 'Microsoft Kalpana - Hindi (India)'
     );
+    const fallbackVoice = voices.find(
+      (v) => v.lang && v.lang.startsWith('en')
+    );
+    const chosenVoice = preferredVoice || fallbackVoice || voices[0];
+
+    if (!chosenVoice) {
+      console.warn('TTS: no voices available, skipping completion sound');
+      return;
+    }
+
+    const isHindi = chosenVoice.lang && chosenVoice.lang.startsWith('hi');
+    const message = isHindi
+      ? `\u092c\u0938 \u0915\u0930\u094b \u092d\u093e\u0908! ${TARGET_HOURS} \u0918\u0902\u091f\u0947 \u0939\u094b \u0917\u090f. \u0905\u092c \u0915\u094d\u092f\u093e \u091c\u093e\u0928 \u0932\u094b\u0917\u0947 \u0915\u094d\u092f\u093e?`
+      : `Great job! You have completed your ${TARGET_HOURS} hour target. Time to wrap up!`;
 
     const options = {
       rate: 1.0,
       pitch: 1.2,
       volume: 1.0,
-      voiceName: hindiVoice ? hindiVoice.voiceName : undefined,
-      lang: 'hi-IN', // Setting this ensures the correct accentuation
+      voiceName: chosenVoice.voiceName,
+      lang: chosenVoice.lang,
     };
-
-    // Updated the text to Hindi for a better experience with this voice
-    const message = `बस करो भाई! ${TARGET_HOURS} घंटे हो गए. अब क्या जान लोगे क्या?`;
 
     chrome.tts.speak(message, options);
   });
@@ -76,13 +87,18 @@ chrome.runtime.onStartup.addListener(async () => {
 });
 
 async function checkAndNotify() {
+  // Dynamic storage keys based on target so flags reset correctly when target changes
+  const warnKey = `notified_${TARGET_HOURS}_warning`;
+  const completeKey = `notified_${TARGET_HOURS}_complete`;
+
+
   const data = await chrome.storage.local.get([
     'punchInTime',
     'isActive',
     'totalBreakTime',
     'breakStartTime',
-    'notified8_5',
-    'notified8',
+    warnKey,
+    completeKey,
   ]);
 
   if (!data.isActive || !data.punchInTime) {
@@ -112,7 +128,7 @@ async function checkAndNotify() {
 
   // Notify at target - 30 minutes (warning)
   const WARNING_TIME_MS = TARGET_MS - 30 * 60 * 1000;
-  if (workingTime >= WARNING_TIME_MS && !data.notified8) {
+  if (workingTime >= WARNING_TIME_MS && !data[warnKey]) {
     chrome.notifications.create('warning-30min', {
       type: 'basic',
       iconUrl: 'icons/icon128.png',
@@ -121,11 +137,11 @@ async function checkAndNotify() {
       priority: 2,
     });
 
-    await chrome.storage.local.set({ notified8: true });
+    await chrome.storage.local.set({ [warnKey]: true });
   }
 
   // Notify at target hours (completion)
-  if (workingTime >= TARGET_MS && !data.notified8_5) {
+  if (workingTime >= TARGET_MS && !data[completeKey]) {
     chrome.notifications.create('complete-target', {
       type: 'basic',
       iconUrl: 'icons/icon128.png',
@@ -143,7 +159,7 @@ async function checkAndNotify() {
       }),
     }).catch((err) => console.error('Email error:', err));
 
-    await chrome.storage.local.set({ notified8_5: true });
+    await chrome.storage.local.set({ [completeKey]: true });
     if (!hasPlayedCompletionSound) {
       playCompletionSound();
       hasPlayedCompletionSound = true;
@@ -171,16 +187,11 @@ chrome.notifications.onClicked.addListener((notificationId) => {
 
 // Clear notification flags when punching in
 chrome.storage.onChanged.addListener((changes, namespace) => {
-  if (
-    namespace === 'local' &&
-    changes.punchInTime &&
-    changes.punchInTime.newValue
-  ) {
-    // New punch in - clear notification flags
-    chrome.storage.local.set({
-      notified8: false,
-      notified8_5: false,
-    });
+  if (namespace === 'local' && changes.punchInTime && changes.punchInTime.newValue) {
+    // New punch in — clear all dynamic notification flags for this target
+    const warnKey = `notified_${TARGET_HOURS}_warning`;
+    const completeKey = `notified_${TARGET_HOURS}_complete`;
+    chrome.storage.local.set({ [warnKey]: false, [completeKey]: false });
     hasPlayedCompletionSound = false;
   }
 
